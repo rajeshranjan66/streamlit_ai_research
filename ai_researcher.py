@@ -26,7 +26,7 @@ Answer:
 langchain_api_key = st.secrets.get("LANGCHAIN_API_KEY")
 unique_id = uuid4().hex[0:8]
 os.environ["LANGCHAIN_TRACING_V2"] = "true"
-os.environ["LANGCHAIN_PROJECT"] = f"TOGAF_Chatbot - {unique_id}"
+os.environ["LANGCHAIN_PROJECT"] = f"AI Research Agent - {unique_id}"
 os.environ["LANGCHAIN_ENDPOINT"] = "https://api.smith.langchain.com"
 os.environ["LANGCHAIN_API_KEY"] = langchain_api_key  # Update to your API ke
 print("LangSmith Project id"+unique_id)
