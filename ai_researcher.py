@@ -1,14 +1,9 @@
 import re
-
 import streamlit as st
 from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnableConfig
-from langchain_core.tracers import LangChainTracer
-from langchain_core.tracers.run_collector import RunCollectorCallbackHandler
 from langchain_openai import ChatOpenAI
 from langgraph.graph import START, END, StateGraph
-from langsmith import Client
 from typing_extensions import TypedDict
 import os
 from uuid import uuid4
@@ -51,7 +46,7 @@ class ResearchStateOutput(TypedDict):
     response: str
 
 def search_web(state: ResearchState):
-    search = TavilySearchResults(max_results=10)
+    search = TavilySearchResults(max_results=8)
     search_results = search.invoke(state["query"])
 
     return  {
@@ -63,45 +58,39 @@ def summarize_results(state: ResearchState):
     model = ChatOpenAI(
         base_url="https://api.deepseek.com/v1",
         api_key=st.secrets["DEEPSEEK_API_KEY"],
-        #Below is for local run
-        #model="deepseek-r1:1.5b"
-        # Below is for deepseek v3 API
-        #model="deepseek-chat"
-        # Below is for deepseek R1 API
-        model="deepseek-reasoner"
+        model="deepseek-chat",
+        streaming=True
     )
     prompt = ChatPromptTemplate.from_template(summary_template)
     chain = prompt | model
 
     summarized_results = []
     for content in state["web_results"]:
+        # For summarization, we'll process immediately as it's a preprocessing step
         summary = chain.invoke({"query": state["query"], "content": content})
         clean_content = clean_text(summary.content)
         summarized_results.append(clean_content)
 
-    return {
-        "summarized_results": summarized_results
-    }
+    return {"summarized_results": summarized_results}
 
 def generate_response(state: ResearchState):
     model = ChatOpenAI(
         base_url="https://api.deepseek.com/v1",
         api_key=st.secrets["DEEPSEEK_API_KEY"],
-       # model="deepseek-r1:1.5b"
-        model="deepseek-chat"
+        model="deepseek-chat",
+        streaming=True
     )
     prompt = ChatPromptTemplate.from_template(generate_response_template)
     chain = prompt | model
 
-    content = "\n\n".join([summary for summary in state["summarized_results"]])
+    content = "\n\n".join(state["summarized_results"])
 
-    return {
-        "response": chain.invoke({"question": state["query"], "context": content})
-    }
+    # Return the stream directly
+    return {"response": chain.stream({"question": state["query"], "context": content})}
 
 def clean_text(text: str):
     cleaned_text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
-    return cleaned_text.strip()
+    return cleaned_text  # Preserves original spacing
 
 builder = StateGraph(
     ResearchState,
@@ -120,15 +109,26 @@ builder.add_edge("generate_response", END)
 
 graph = builder.compile()
 
-st.set_page_config(page_title="AI Researcher")
+st.set_page_config(page_title="AI Research Agent")
 #st.title("AI Researcher")
 st.subheader("Welcome to AI Research Agent !")
 query = st.text_area("Enter your query here:")
 
 if query:
+    # Execute the graph normally
     response_state = graph.invoke({"query": query})
-    st.write(clean_text(response_state["response"].content))
 
+    # Create a container for the streaming response
+    response_container = st.empty()
+    full_response = []
+
+    # Stream the final response only
+    for chunk in response_state["response"]:
+        chunk_text = clean_text(chunk.content)
+        full_response.append(chunk_text)
+        response_container.markdown("".join(full_response))
+
+    # Show sources after streaming completes
     st.subheader("Sources:")
     for source in response_state["sources"]:
         st.write(source)
