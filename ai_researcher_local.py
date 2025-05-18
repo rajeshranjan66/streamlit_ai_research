@@ -4,7 +4,6 @@ import streamlit as st
 from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_ollama import ChatOllama
-from langchain_openai import ChatOpenAI
 from langgraph.graph import START, END, StateGraph
 from typing_extensions import TypedDict
 
@@ -48,11 +47,7 @@ def search_web(state: ResearchState):
     }
 
 def summarize_results(state: ResearchState):
-    model = ChatOpenAI(
-        base_url="https://api.deepseek.com/v1",
-        api_key=st.secrets["DEEPSEEK_API_KEY"],
-        model="deepseek-r1:1.5b"
-    )
+    model = ChatOllama(model="deepseek-r1:1.5b")
     prompt = ChatPromptTemplate.from_template(summary_template)
     chain = prompt | model
 
@@ -67,11 +62,7 @@ def summarize_results(state: ResearchState):
     }
 
 def generate_response(state: ResearchState):
-    model = ChatOpenAI(
-        base_url="https://api.deepseek.com/v1",
-        api_key=st.secrets["DEEPSEEK_API_KEY"],
-        model="deepseek-r1:1.5b"
-    )
+    model = ChatOllama(model="deepseek-r1:1.5b")
     prompt = ChatPromptTemplate.from_template(generate_response_template)
     chain = prompt | model
 
