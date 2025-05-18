@@ -3,10 +3,15 @@ import re
 import streamlit as st
 from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_ollama import ChatOllama
+from langchain_core.runnables import RunnableConfig
+from langchain_core.tracers import LangChainTracer
+from langchain_core.tracers.run_collector import RunCollectorCallbackHandler
 from langchain_openai import ChatOpenAI
 from langgraph.graph import START, END, StateGraph
+from langsmith import Client
 from typing_extensions import TypedDict
+import os
+from uuid import uuid4
 
 summary_template = """
 Summarize the following content into a concise paragraph that directly addresses the query. Ensure the summary 
@@ -23,6 +28,13 @@ Question: {question}
 Context: {context} 
 Answer:
 """
+langchain_api_key = st.secrets.get("LANGCHAIN_API_KEY")
+unique_id = uuid4().hex[0:8]
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
+os.environ["LANGCHAIN_PROJECT"] = f"TOGAF_Chatbot - {unique_id}"
+os.environ["LANGCHAIN_ENDPOINT"] = "https://api.smith.langchain.com"
+os.environ["LANGCHAIN_API_KEY"] = langchain_api_key  # Update to your API ke
+print("LangSmith Project id"+unique_id)
 
 class ResearchState(TypedDict):
     query: str
@@ -39,7 +51,7 @@ class ResearchStateOutput(TypedDict):
     response: str
 
 def search_web(state: ResearchState):
-    search = TavilySearchResults(max_results=3)
+    search = TavilySearchResults(max_results=10)
     search_results = search.invoke(state["query"])
 
     return  {
@@ -51,8 +63,12 @@ def summarize_results(state: ResearchState):
     model = ChatOpenAI(
         base_url="https://api.deepseek.com/v1",
         api_key=st.secrets["DEEPSEEK_API_KEY"],
+        #Below is for local run
         #model="deepseek-r1:1.5b"
-        model="deepseek-chat"
+        # Below is for deepseek v3 API
+        #model="deepseek-chat"
+        # Below is for deepseek R1 API
+        model="deepseek-reasoner"
     )
     prompt = ChatPromptTemplate.from_template(summary_template)
     chain = prompt | model
@@ -104,8 +120,10 @@ builder.add_edge("generate_response", END)
 
 graph = builder.compile()
 
-st.title("AI Researcher")
-query = st.text_input("Enter your research query:")
+st.set_page_config(page_title="AI Researcher")
+#st.title("AI Researcher")
+st.subheader("Welcome to AI Research Agent !")
+query = st.text_area("Enter your query here:")
 
 if query:
     response_state = graph.invoke({"query": query})
