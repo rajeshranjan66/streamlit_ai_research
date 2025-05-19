@@ -111,7 +111,7 @@ graph = builder.compile()
 
 st.set_page_config(page_title="AI Research Agent")
 #st.title("AI Researcher")
-st.subheader("Welcome to AI Research Agent !")
+st.subheader("Welcome to AI Research Agent")
 query = st.text_input("Enter your query here:")
 #query = st.text_area("Enter your query here:")
 
