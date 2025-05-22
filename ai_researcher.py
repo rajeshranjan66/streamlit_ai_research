@@ -1,35 +1,44 @@
 import re
 import streamlit as st
+import time
 from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
-from langgraph.graph import START, END, StateGraph
+from langgraph.graph import StateGraph
 from typing_extensions import TypedDict
 import os
 from uuid import uuid4
 
+# Initialize session state for chat history
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
 summary_template = """
-Summarize the following content into a concise paragraph that directly addresses the query. Ensure the summary 
-highlights the key points relevant to the query while maintaining clarity and completeness.
+Summarize the following content into a concise paragraph that directly addresses the query. 
+Ensure the summary highlights the key points relevant to the query while maintaining clarity.
 Query: {query}
 Content: {content}
 """
 
 generate_response_template = """    
 Given the following user query and content, generate a response that directly answers the query using relevant 
-information from the content. Ensure that the response is clear, concise, and well-structured. 
-Additionally, provide a brief summary of the key points from the response. 
+information from the content. Ensure that the response is clear, concise, and well-structured.
 Question: {question} 
 Context: {context} 
 Answer:
 """
+
+# Configuration and setup
 langchain_api_key = st.secrets.get("LANGCHAIN_API_KEY")
 unique_id = uuid4().hex[0:8]
-os.environ["LANGCHAIN_TRACING_V2"] = "true"
-os.environ["LANGCHAIN_PROJECT"] = f"AI Research Agent - {unique_id}"
-os.environ["LANGCHAIN_ENDPOINT"] = "https://api.smith.langchain.com"
-os.environ["LANGCHAIN_API_KEY"] = langchain_api_key  # Update to your API ke
-print("LangSmith Project id"+unique_id)
+os.environ.update({
+    "LANGCHAIN_TRACING_V2": "true",
+    "LANGCHAIN_PROJECT": f"AI Research Agent - {unique_id}",
+    "LANGCHAIN_ENDPOINT": "https://api.smith.langchain.com",
+    "LANGCHAIN_API_KEY": langchain_api_key
+})
+
 
 class ResearchState(TypedDict):
     query: str
@@ -38,21 +47,15 @@ class ResearchState(TypedDict):
     summarized_results: list[str]
     response: str
 
-class ResearchStateInput(TypedDict):
-    query: str
-
-class ResearchStateOutput(TypedDict):
-    sources: list[str]
-    response: str
 
 def search_web(state: ResearchState):
-    search = TavilySearchResults(max_results=8)
+    search = TavilySearchResults(max_results=3)
     search_results = search.invoke(state["query"])
-
-    return  {
+    return {
         "sources": [result['url'] for result in search_results],
         "web_results": [result['content'] for result in search_results]
     }
+
 
 def summarize_results(state: ResearchState):
     model = ChatOpenAI(
@@ -63,15 +66,12 @@ def summarize_results(state: ResearchState):
     )
     prompt = ChatPromptTemplate.from_template(summary_template)
     chain = prompt | model
-
     summarized_results = []
     for content in state["web_results"]:
-        # For summarization, we'll process immediately as it's a preprocessing step
         summary = chain.invoke({"query": state["query"], "content": content})
-        clean_content = clean_text(summary.content)
-        summarized_results.append(clean_content)
-
+        summarized_results.append(clean_text(summary.content))
     return {"summarized_results": summarized_results}
+
 
 def generate_response(state: ResearchState):
     model = ChatOpenAI(
@@ -82,54 +82,92 @@ def generate_response(state: ResearchState):
     )
     prompt = ChatPromptTemplate.from_template(generate_response_template)
     chain = prompt | model
-
-    content = "\n\n".join(state["summarized_results"])
-
-    # Return the stream directly
+    content = "\n\n".join(clean_text(result) for result in state["summarized_results"])
     return {"response": chain.stream({"question": state["query"], "context": content})}
+
 
 def clean_text(text: str):
     cleaned_text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
     return cleaned_text  # Preserves original spacing
 
-builder = StateGraph(
-    ResearchState,
-    input=ResearchStateInput,
-    output=ResearchStateOutput
-)
 
+
+# Build LangGraph workflow
+builder = StateGraph(ResearchState)
 builder.add_node("search_web", search_web)
 builder.add_node("summarize_results", summarize_results)
 builder.add_node("generate_response", generate_response)
-
-builder.add_edge(START, "search_web")
+builder.set_entry_point("search_web")
 builder.add_edge("search_web", "summarize_results")
 builder.add_edge("summarize_results", "generate_response")
-builder.add_edge("generate_response", END)
-
+builder.set_finish_point("generate_response")
 graph = builder.compile()
 
-st.set_page_config(page_title="AI Research Agent")
-#st.title("AI Researcher")
+# ... [keep all imports and configuration code unchanged] ...
+
+# Streamlit UI
+st.set_page_config(page_title="AI Research Agent", layout="wide")
 st.subheader("Welcome to AI Research Agent")
-query = st.text_input("Enter your query here:")
-#query = st.text_area("Enter your query here:")
 
-if query:
-    # Execute the graph normally
-    response_state = graph.invoke({"query": query})
+# Sidebar controls
+with st.sidebar:
+    if st.button("🧹 Clear Chat History"):
+        st.session_state.messages = []
 
-    # Create a container for the streaming response
-    response_container = st.empty()
-    full_response = []
+# Display chat history
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"], unsafe_allow_html=True)
 
-    # Stream the final response only
-    for chunk in response_state["response"]:
-        chunk_text = clean_text(chunk.content)
-        full_response.append(chunk_text)
-        response_container.markdown("".join(full_response))
+# Chat input and processing
+if prompt := st.chat_input("Enter your research query..."):
+    # Immediately display user message
+    with st.chat_message("user"):
+        st.markdown(prompt)
 
-    # Show sources after streaming completes
-    st.subheader("Sources:")
-    for source in response_state["sources"]:
-        st.write(source)
+    # Add user message to history and trigger rerun
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    st.rerun()  # Force immediate UI update for user message
+
+# Process after rerun when messages exist
+if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
+    user_prompt = st.session_state.messages[-1]["content"]
+
+    # Create placeholder for assistant response
+    with st.chat_message("assistant"):
+        response_placeholder = st.empty()
+        sources_placeholder = st.empty()
+
+    with st.spinner("Researching..."):
+        start_time = time.time()
+        response_state = graph.invoke({"query": user_prompt})
+        full_response = []
+
+        # Stream response
+        for chunk in response_state["response"]:
+            chunk_text = clean_text(chunk.content)
+            full_response.append(chunk_text)
+            response_placeholder.markdown("".join(full_response), unsafe_allow_html=True)
+
+        # Final processing
+        final_text = "".join(full_response)
+        duration = time.time() - start_time
+
+        # Create footnote style
+        footnote = f"<div style='font-size:0.8em; color:#666; margin-top:10px;'>⏱️ Processed in {duration:.2f}s</div>"
+
+        # Update response
+        formatted_response = f"{final_text}\n{footnote}"
+        response_placeholder.markdown(formatted_response, unsafe_allow_html=True)
+
+        # Show sources
+        sources_placeholder.markdown("🔗 **Sources**:\n" + "\n".join(
+            f"- {source}" for source in response_state["sources"]
+        ))
+
+        # Add assistant response to history
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": f"{final_text}\n{footnote}\n\n🔗 **Sources**:\n" +
+                       "\n".join(f"- {source}" for source in response_state["sources"])
+        })
