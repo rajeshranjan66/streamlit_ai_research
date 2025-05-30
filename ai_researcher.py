@@ -15,17 +15,31 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 summary_template = """
-Summarize the following content into a concise paragraph that directly addresses the query. 
-Ensure the summary highlights the key points relevant to the query while maintaining clarity.
+Summarize the following content into a well-structured and concise paragraph that directly addresses the user's query. 
+Ensure the summary highlights the most **relevant and key points**, presenting them in a **clear, coherent, and informative** manner. 
+Avoid unnecessary details while maintaining completeness, factual accuracy, and readability.
+
+Focus on:
+- Extracting **critical insights** related to the query.
+- Providing a **concise yet meaningful** synthesis of the content.
+- Maintaining a **natural and engaging tone** for better readability.
+
 Query: {query}
 Content: {content}
 """
 
 generate_response_template = """    
-Given the following user query and content, generate a response that directly answers the query using relevant 
-information from the content. Ensure that the response is clear, concise, and well-structured.
-Question: {question} 
-Context: {context} 
+Generate a **clear, concise, and well-structured** response based on the given user query and contextual content. 
+Ensure that the answer directly addresses the query using the **most relevant and accurate information** extracted from the content. 
+
+Key Guidelines:
+- **Prioritize relevance**—focus on the most **useful and insightful** details.
+- **Maintain readability**—use a **natural, engaging tone** while ensuring clarity.
+- **Structure effectively**—organize the response logically for easy comprehension.
+- **Summarize key points**—provide a brief, well-defined **summary** at the end to highlight essential takeaways.
+
+Question: {question}  
+Context: {context}  
 Answer:
 """
 
