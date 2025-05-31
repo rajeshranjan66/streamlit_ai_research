@@ -29,7 +29,7 @@
 
 ### Prerequisites
 
-- Python 3.12
+- Python 3.8+
 - [Streamlit](https://streamlit.io/)
 - [LangChain](https://github.com/langchain-ai/langchain)
 - [LangGraph](https://github.com/langchain-ai/langgraph)
@@ -37,9 +37,28 @@
 
 ### Installation
 
-```bash
+bash
 git clone https://github.com/rajeshranjan66/streamlit_ai_research.git
 cd streamlit_ai_research
 pip install -r requirements.txt
 
-### Installation
+--
+
+
+
+### 🛠️ Setup API Keys
+TOML
+# .streamlit/secrets.toml
+
+LANGCHAIN_API_KEY = "your_langchain_api_key"
+DEEPSEEK_API_KEY = "your_deepseek_api_key"
+Place this file at .streamlit/secrets.toml in your project directory.
+Replace the placeholder values with your actual API keys.
+
+--
+
+💬 Usage
+Enter your research query in the chat input at the bottom of the app.
+Clear Chat History: Use the sidebar button to reset the conversation.
+Stop Streaming: Use the sidebar button to stop a long or unwanted AI response in real time.
+Sources are shown with each answer for transparency.
