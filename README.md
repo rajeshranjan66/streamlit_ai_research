@@ -75,7 +75,7 @@ summary_template: Used to condense web search results into concise summaries.
 generate_response_template: Synthesizes summaries into a single, structured, relevant answer.
 
 ### 3. API Key and Environment Configuration
-Reads secrets from Streamlit’s secret storage.
+Reads secrets from Streamlit’s secret storage.\n\n
 Sets environment variables for LangChain tracing and project settings.
 
 ### 4. Core Functions
