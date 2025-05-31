@@ -105,8 +105,6 @@ def clean_text(text: str):
     cleaned_text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
     return cleaned_text  # Preserves original spacing
 
-
-
 # Build LangGraph workflow
 builder = StateGraph(ResearchState)
 builder.add_node("search_web", search_web)
@@ -118,7 +116,7 @@ builder.add_edge("summarize_results", "generate_response")
 builder.set_finish_point("generate_response")
 graph = builder.compile()
 
-# ... [keep all imports and configuration code unchanged] ...
+
 
 # Streamlit UI
 st.set_page_config(page_title="AI Research Agent", layout="wide")
