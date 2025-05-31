@@ -29,7 +29,7 @@
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.12
 - [Streamlit](https://streamlit.io/)
 - [LangChain](https://github.com/langchain-ai/langchain)
 - [LangGraph](https://github.com/langchain-ai/langgraph)
