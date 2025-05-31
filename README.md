@@ -42,5 +42,3 @@ git clone https://github.com/rajeshranjan66/streamlit_ai_research.git
 cd streamlit_ai_research
 pip install -r requirements.txt
 
-###
-
