@@ -21,6 +21,21 @@ Query: {query}
 Content: {content}
 """
 
+generate_response_template = """    
+Generate a **clear, concise, and well-structured** response based on the given user query and contextual content. 
+Ensure that the answer directly addresses the query using the **most relevant and accurate information** extracted from the content. 
+
+Key Guidelines:
+- **Prioritize relevance**—focus on the most **useful and insightful** details.
+- **Maintain readability**—use a **natural, engaging tone** while ensuring clarity.
+- **Structure effectively**—organize the response logically for easy comprehension.
+- **Summarize key points**—provide a brief, well-defined **summary** at the end to highlight essential takeaways.
+
+Question: {question}  
+Context: {context}  
+Answer:
+"""
+
 class ResearchState(TypedDict):
     query: str
     sources: list[str]
