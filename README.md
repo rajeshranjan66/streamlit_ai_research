@@ -40,12 +40,85 @@
 ```bash
 git clone https://github.com/rajeshranjan66/streamlit_ai_research.git
 cd streamlit_ai_research
-pip install -r requirements.txt```
+pip install -r requirements.txt
 ```
-###🔑 Setup API Keys
+### 🔑 Setup API Keys
+Create a file at .streamlit/secrets.toml in your project directory and add:
 
+LANGCHAIN_API_KEY = "your_langchain_api_key"
+DEEPSEEK_API_KEY = "your_deepseek_api_key"
 
+Replace the placeholder values with your actual API keys.
 
+### 💬 Usage
+Type your research question into the chat input at the bottom of the app.
+Use the sidebar to clear the chat history or stop streaming a response.
+Answers include relevant sources for transparency.
 
+Start the app with:
+```bash
+streamlit run ai_researcher.py
+```
+
+---
+## 🧑‍💻 Code Structure and Explanation
+This section provides a block-by-block walkthrough of ai_researcher.py, explaining each part for new developers.
+
+### 1. Imports and Session State
+Imports Streamlit, LangChain, LangGraph, Tavily, DeepSeek, and utility modules.
+Initializes session state variables for chat history (messages) and streaming control (stop_streaming).
+Defines fun error messages for a better user experience.
+
+### 2. Prompt Templates
+   
+summary_template: Used to condense web search results into concise summaries.
+generate_response_template: Synthesizes summaries into a single, structured, relevant answer.
+
+### 3. API Key and Environment Configuration
+Reads secrets from Streamlit’s secret storage.
+Sets environment variables for LangChain tracing and project settings.
+
+### 4. Core Functions
+   
+search_web: Uses Tavily to perform web search.
+summarize_results: Uses DeepSeek to summarize web results.
+generate_response: Synthesizes all summaries into one answer and streams the result.
+clean_text: Removes unwanted tags or formatting from AI output.
+
+### 5. Workflow with LangGraph
+   
+Uses LangGraph’s StateGraph to chain workflow steps:
+search_web → summarize_results → generate_response
+Modular and easy to extend.
+
+### 6. Streamlit UI Handling
+    
+Sidebar: clear chat, stop streaming.
+Chat display: user and AI messages.
+Chat input: for research queries.
+Message processing: runs workflow, streams responses, shows sources and processing time.
+Error handling: fun error messages and user interruption support.
+
+### 7. Error Handling
+    
+StreamingStoppedError: Custom exception for stopping output mid-response.
+Randomized error messages for a friendly experience.
+
+### 8. Tips for Developers
+Add new LLMs or APIs by updating summarization or response functions.
+Add workflow steps by extending the LangGraph workflow.
+Refine prompt templates for different answer styles.
+Expand error handling as needed.
+
+### 9.License
+
+MIT License
+
+### 10.Acknowledgments
+
+LangChain
+Streamlit
+DeepSeek
+Tavily
 
 
