@@ -14,6 +14,7 @@ from uuid import uuid4
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+#prompt to be used by different nodes for creating summary and generating final response
 summary_template = """
 Summarize the following content into a well-structured and concise paragraph that directly addresses the user's query. 
 Ensure the summary highlights the most **relevant and key points**, presenting them in a **clear, coherent, and informative** manner. 
