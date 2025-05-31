@@ -6,13 +6,13 @@
 
 ## 🚀 Features
 
-- Conversational, chat-style research Q&A
-- Web search integration (Tavily Search)
-- AI-powered summarization (DeepSeek, OpenAI)
-- Streaming responses for live updates
-- Chat history memory
-- Sidebar controls (clear chat, stop streaming)
-- Fun error messages
+- Conversational Research: Ask any research question and get a well-structured, summarized answer with sources. <br>
+- Web Search Integration: Retrieves the latest information from the web using Tavily Search.<br>
+- AI-Powered Summarization: Uses advanced LLMs (DeepSeek, OpenAI) to summarize and synthesize information.<br>
+- Streaming Responses: See answers generated live in a chat-like interface.<br>
+- Session Memory: Maintains chat history for seamless multi-turn conversations.<br>
+- User Controls: Clear chat history or stop response streaming anytime.<br>
+- Fun Error Handling: Enjoy lighthearted error messages when things go wrong.<br>
 
 ---
 
@@ -45,15 +45,15 @@ pip install -r requirements.txt
 ### 🔑 Setup API Keys
 Create a file at .streamlit/secrets.toml in your project directory and add:
 
-LANGCHAIN_API_KEY = "your_langchain_api_key"
-DEEPSEEK_API_KEY = "your_deepseek_api_key"
+- LANGCHAIN_API_KEY = "your_langchain_api_key" <br>
+- DEEPSEEK_API_KEY = "your_deepseek_api_key" <br>
 
 Replace the placeholder values with your actual API keys.
 
 ### 💬 Usage
-Type your research question into the chat input at the bottom of the app.
-Use the sidebar to clear the chat history or stop streaming a response.
-Answers include relevant sources for transparency.
+- Type your research question into the chat input at the bottom of the app.<br>
+- Use the sidebar to clear the chat history or stop streaming a response.<br>
+- Answers include relevant sources for transparency.<br>
 
 Start the app with:
 ```bash
