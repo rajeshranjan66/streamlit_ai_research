@@ -3,17 +3,25 @@ import streamlit as st
 import time
 from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_ollama import ChatOllama
+#from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph
 from typing_extensions import TypedDict
 import os
 from uuid import uuid4
+import random
 
 # Initialize session state for chat history
 if "messages" not in st.session_state:
     st.session_state.messages = []
-
+# Define some funny error messages
+funny_messages = [
+    "Oops! Something went wrong... Maybe it's a feature, not a bug? 🤖",
+    "Error 404: AI's confidence not found. Let's try again! 😵‍💫",
+    "Houston, we have a problem! But don't worry, it's just a minor hiccup. 🚀",
+    "Well, this is awkward... Let's pretend this never happened. 😅",
+    "Looks like we summoned the error gods today. Let's appease them with a retry! 🔄"
+]
 #prompt to be used by different nodes for creating summary and generating final response
 summary_template = """
 Summarize the following content into a well-structured and concise paragraph that directly addresses the user's query. 
@@ -144,43 +152,46 @@ if prompt := st.chat_input("Enter your research query..."):
 
 # Process after rerun when messages exist
 if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
-    user_prompt = st.session_state.messages[-1]["content"]
+    try:
+        user_prompt = st.session_state.messages[-1]["content"]
 
-    # Create placeholder for assistant response
-    with st.chat_message("assistant"):
-        response_placeholder = st.empty()
-        sources_placeholder = st.empty()
+        # Create placeholder for assistant response
+        with st.chat_message("assistant"):
+            response_placeholder = st.empty()
+            sources_placeholder = st.empty()
 
-    with st.spinner("Researching..."):
-        start_time = time.time()
-        response_state = graph.invoke({"query": user_prompt})
-        full_response = []
+        with st.spinner("Researching..."):
+            start_time = time.time()
+            response_state = graph.invoke({"query": user_prompt})
+            full_response = []
 
-        # Stream response
-        for chunk in response_state["response"]:
-            chunk_text = clean_text(chunk.content)
-            full_response.append(chunk_text)
-            response_placeholder.markdown("".join(full_response), unsafe_allow_html=True)
+            # Stream response
+            for chunk in response_state["response"]:
+                chunk_text = clean_text(chunk.content)
+                full_response.append(chunk_text)
+                response_placeholder.markdown("".join(full_response), unsafe_allow_html=True)
 
-        # Final processing
-        final_text = "".join(full_response)
-        duration = time.time() - start_time
+            # Final processing
+            final_text = "".join(full_response)
+            duration = time.time() - start_time
 
-        # Create footnote style
-        footnote = f"<div style='font-size:0.8em; color:#666; margin-top:10px;'>⏱️ Processed in {duration:.2f}s</div>"
+            # Create footnote style
+            footnote = f"<div style='font-size:0.8em; color:#666; margin-top:10px;'>⏱️ Processed in {duration:.2f}s</div>"
 
-        # Update response
-        formatted_response = f"{final_text}\n{footnote}"
-        response_placeholder.markdown(formatted_response, unsafe_allow_html=True)
+            # Update response
+            formatted_response = f"{final_text}\n{footnote}"
+            response_placeholder.markdown(formatted_response, unsafe_allow_html=True)
 
-        # Show sources
-        sources_placeholder.markdown("🔗 **Sources**:\n" + "\n".join(
-            f"- {source}" for source in response_state["sources"]
-        ))
+            # Show sources
+            sources_placeholder.markdown("🔗 **Sources**:\n" + "\n".join(
+                f"- {source}" for source in response_state["sources"]
+            ))
 
-        # Add assistant response to history
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": f"{final_text}\n{footnote}\n\n🔗 **Sources**:\n" +
-                       "\n".join(f"- {source}" for source in response_state["sources"])
-        })
+            # Add assistant response to history
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": f"{final_text}\n{footnote}\n\n🔗 **Sources**:\n" +
+                           "\n".join(f"- {source}" for source in response_state["sources"])
+            })
+    except Exception as e:
+        st.error(random.choice(funny_messages))
