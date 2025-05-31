@@ -42,6 +42,11 @@ git clone https://github.com/rajeshranjan66/streamlit_ai_research.git
 cd streamlit_ai_research
 pip install -r requirements.txt
 
+📚 Tips for Developers
+Add new LLMs or APIs: Update the summarization or response functions.
+Add workflow steps: Extend the LangGraph workflow with new nodes.
+Enhance prompts: Refine or add prompt templates for different answer styles.
+Improve error handling: Add creative messages or new exception types.
 
 
 
