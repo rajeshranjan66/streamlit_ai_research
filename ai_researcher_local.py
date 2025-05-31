@@ -8,19 +8,17 @@ from langgraph.graph import START, END, StateGraph
 from typing_extensions import TypedDict
 
 summary_template = """
-Summarize the following content into a concise paragraph that directly addresses the query. Ensure the summary 
-highlights the key points relevant to the query while maintaining clarity and completeness.
+Summarize the following content into a well-structured and concise paragraph that directly addresses the user's query. 
+Ensure the summary highlights the most **relevant and key points**, presenting them in a **clear, coherent, and informative** manner. 
+Avoid unnecessary details while maintaining completeness, factual accuracy, and readability.
+
+Focus on:
+- Extracting **critical insights** related to the query.
+- Providing a **concise yet meaningful** synthesis of the content.
+- Maintaining a **natural and engaging tone** for better readability.
+
 Query: {query}
 Content: {content}
-"""
-
-generate_response_template = """    
-Given the following user query and content, generate a response that directly answers the query using relevant 
-information from the content. Ensure that the response is clear, concise, and well-structured. 
-Additionally, provide a brief summary of the key points from the response. 
-Question: {question} 
-Context: {context} 
-Answer:
 """
 
 class ResearchState(TypedDict):
