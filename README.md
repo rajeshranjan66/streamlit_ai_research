@@ -36,7 +36,7 @@
 - Tavily, DeepSeek, and (optionally) OpenAI API keys
 
 ### Installation
-
+Setp python virtual enviornment using [this link] (https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments)
 ```bash
 git clone https://github.com/rajeshranjan66/streamlit_ai_research.git
 cd streamlit_ai_research
