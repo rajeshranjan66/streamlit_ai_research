@@ -42,20 +42,5 @@ git clone https://github.com/rajeshranjan66/streamlit_ai_research.git
 cd streamlit_ai_research
 pip install -r requirements.txt
 
-
-Setup API Keys
-Create .streamlit/secrets.toml with:
-
-
-TOML
-LANGCHAIN_API_KEY = "your_langchain_api_key"
-DEEPSEEK_API_KEY = "your_deepseek_api_key"
-
-Run the App
-streamlit run ai_researcher.py
-
-💬 Usage
-Enter your research query in the chat box.
-Use the sidebar to clear chat or stop streaming.
-Answers include sources and are streamed live.
+###
 
