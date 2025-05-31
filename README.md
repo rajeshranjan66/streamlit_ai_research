@@ -65,9 +65,9 @@ streamlit run ai_researcher.py
 This section provides a block-by-block walkthrough of ai_researcher.py, explaining each part for new developers.
 
 ### 1. Imports and Session State
-Imports Streamlit, LangChain, LangGraph, Tavily, DeepSeek, and utility modules.
-Initializes session state variables for chat history (messages) and streaming control (stop_streaming).
-Defines fun error messages for a better user experience.
+Imports Streamlit, LangChain, LangGraph, Tavily, DeepSeek, and utility modules. <br>
+Initializes session state variables for chat history (messages) and streaming control (stop_streaming).<br>
+Defines fun error messages for a better user experience.<br>
 
 ### 2. Prompt Templates
    
