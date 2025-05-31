@@ -14,6 +14,8 @@ import random
 # Initialize session state for chat history
 if "messages" not in st.session_state:
     st.session_state.messages = []
+if "stop_streaming" not in st.session_state:
+    st.session_state.stop_streaming = False
 # Define some funny error messages
 funny_messages = [
     "Oops! Something went wrong... Maybe it's a feature, not a bug? 🤖",
@@ -72,6 +74,8 @@ class ResearchState(TypedDict):
 
 
 def search_web(state: ResearchState):
+    if st.session_state.stop_streaming:
+        raise StreamingStoppedError()
     search = TavilySearchResults(max_results=3)
     search_results = search.invoke(state["query"])
     return {
@@ -81,6 +85,8 @@ def search_web(state: ResearchState):
 
 
 def summarize_results(state: ResearchState):
+    if st.session_state.stop_streaming:
+        raise StreamingStoppedError()
     model = ChatOpenAI(
         base_url="https://api.deepseek.com/v1",
         api_key=st.secrets["DEEPSEEK_API_KEY"],
@@ -97,6 +103,8 @@ def summarize_results(state: ResearchState):
 
 
 def generate_response(state: ResearchState):
+    if st.session_state.stop_streaming:
+        raise StreamingStoppedError()
     model = ChatOpenAI(
         base_url="https://api.deepseek.com/v1",
         api_key=st.secrets["DEEPSEEK_API_KEY"],
@@ -134,6 +142,8 @@ st.subheader("Welcome to AI Research Agent")
 with st.sidebar:
     if st.button("🧹 Clear Chat History"):
         st.session_state.messages = []
+    if st.button("🛑 Stop Streaming"):
+        st.session_state.stop_streaming = True
 
 # Display chat history
 for message in st.session_state.messages:
@@ -142,16 +152,24 @@ for message in st.session_state.messages:
 
 # Chat input and processing
 if prompt := st.chat_input("Enter your research query..."):
-    # Immediately display user message
+    st.session_state.stop_streaming = False  # Reset streaming flag for new queries
     with st.chat_message("user"):
         st.markdown(prompt)
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    st.rerun()
 
     # Add user message to history and trigger rerun
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.rerun()  # Force immediate UI update for user message
 
 # Process after rerun when messages exist
+class StreamingStoppedError(Exception):
+    """Custom exception raised when streaming is stopped."""
+    def __init__(self, message="Streaming has been stopped"):
+        super().__init__(message)
+
 if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
+    # Process AI response
     try:
         user_prompt = st.session_state.messages[-1]["content"]
 
@@ -163,35 +181,53 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "user"
         with st.spinner("Researching..."):
             start_time = time.time()
             response_state = graph.invoke({"query": user_prompt})
+
             full_response = []
 
-            # Stream response
             for chunk in response_state["response"]:
+                if st.session_state.stop_streaming:
+                    # Explicitly set role to assistant before stopping
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "content": "".join(full_response)  # Preserve streamed content
+                    })
+                    raise StreamingStoppedError()  # Interrupt response generation
+
                 chunk_text = clean_text(chunk.content)
                 full_response.append(chunk_text)
+
+                # Continuously update session state with streamed text, ensuring role stays assistant
+                if len(st.session_state.messages) > 0 and st.session_state.messages[-1]["role"] == "assistant":
+                    st.session_state.messages[-1]["content"] = "".join(full_response)
+                else:
+                    st.session_state.messages.append({"role": "assistant", "content": "".join(full_response)})
+
                 response_placeholder.markdown("".join(full_response), unsafe_allow_html=True)
 
             # Final processing
             final_text = "".join(full_response)
             duration = time.time() - start_time
-
-            # Create footnote style
             footnote = f"<div style='font-size:0.8em; color:#666; margin-top:10px;'>⏱️ Processed in {duration:.2f}s</div>"
 
-            # Update response
             formatted_response = f"{final_text}\n{footnote}"
             response_placeholder.markdown(formatted_response, unsafe_allow_html=True)
 
-            # Show sources
-            sources_placeholder.markdown("🔗 **Sources**:\n" + "\n".join(
-                f"- {source}" for source in response_state["sources"]
-            ))
+            sources_placeholder.markdown(
+                "🔗 **Sources**:\n" + "\n".join(f"- {src}" for src in response_state["sources"]))
 
-            # Add assistant response to history
+            # Ensure final response is stored before UI refresh
             st.session_state.messages.append({
                 "role": "assistant",
                 "content": f"{final_text}\n{footnote}\n\n🔗 **Sources**:\n" +
                            "\n".join(f"- {source}" for source in response_state["sources"])
             })
-    except Exception as e:
-        st.error(random.choice(funny_messages))
+
+        st.session_state.stop_streaming = False  # Reset flag after response
+
+    except StreamingStoppedError as e:
+        st.error(str(e))  # Display "Streaming has been stopped by the user."
+        st.session_state.stop_streaming = False  # Reset flag after stopping
+
+    except Exception:
+        st.error(random.choice(funny_messages))  # Show a random funny error message
+
