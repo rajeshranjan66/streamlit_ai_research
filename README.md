@@ -47,6 +47,7 @@ Create a file at .streamlit/secrets.toml in your project directory and add:
 
 - LANGCHAIN_API_KEY = "your_langchain_api_key" <br>
 - DEEPSEEK_API_KEY = "your_deepseek_api_key" <br>
+- TAVILY_API_KEY = "your_tavily_api_key"
 
 Replace the placeholder values with your actual API keys.
 
