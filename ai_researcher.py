@@ -162,7 +162,7 @@ if prompt := st.chat_input("Enter your research query..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.rerun()  # Force immediate UI update for user message
 
-# Process after rerun when messages exist
+# Custom error handling class
 class StreamingStoppedError(Exception):
     """Custom exception raised when streaming is stopped."""
     def __init__(self, message="Streaming has been stopped"):
