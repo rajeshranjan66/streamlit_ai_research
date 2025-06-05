@@ -90,8 +90,8 @@ def summarize_results(state: ResearchState):
     model = ChatOpenAI(
         base_url="https://api.deepseek.com/v1",
         api_key=st.secrets["DEEPSEEK_API_KEY"],
-        #model="deepseek-chat",
-        model="deepseek-reasoner",
+        model="deepseek-chat",
+        #model="deepseek-reasoner",
         streaming=True
     )
     prompt = ChatPromptTemplate.from_template(summary_template)
@@ -109,7 +109,8 @@ def generate_response(state: ResearchState):
     model = ChatOpenAI(
         base_url="https://api.deepseek.com/v1",
         api_key=st.secrets["DEEPSEEK_API_KEY"],
-        model="deepseek-reasoner",
+        model="deepseek-chat",
+        #model="deepseek-reasoner",
         streaming=True
     )
     prompt = ChatPromptTemplate.from_template(generate_response_template)
