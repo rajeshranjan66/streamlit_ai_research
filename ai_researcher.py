@@ -1,21 +1,53 @@
 import re
 import streamlit as st
 import time
+import logging
 from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_core.prompts import ChatPromptTemplate
-#from langchain_ollama import ChatOllama
+# from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph
 from typing_extensions import TypedDict
 import os
 from uuid import uuid4
 import random
+from langgraph.checkpoint.memory import MemorySaver
 
-# Initialize session state for chat history
+# Set up logging (for diagnostics)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+class ExtendedMemorySaver(MemorySaver):
+    """
+    Extend the MemorySaver to add a checkpoint method.
+    This implementation simply keeps a reference to the latest state and logs changes.
+    """
+    def checkpoint(self, state):
+        self.latest_state = state
+        logging.info("Checkpoint updated: %s", state)
+
+# Create a singleton instance for this run.
+memory_saver = ExtendedMemorySaver()
+
+# A helper to update the state from config.
+def update_state_with_config(state: dict, config: dict) -> dict:
+    """
+    Merge configuration-provided updates into the state.
+    For example, if config contains a key "state_update", its items will be merged into state.
+    """
+    if config is None:
+        return state
+    state_update = config.get("state_update", {})
+    if state_update:
+        logging.info("***********************Updating state with config: %s", state_update)
+        state.update(state_update)
+    return state
+
+# Initialize Streamlit session state for chat history and streaming flag.
 if "messages" not in st.session_state:
-    st.session_state.messages = []
+    st.session_state.messages = []  # List[dict] with entries like {"role": "...", "content": "..."}
 if "stop_streaming" not in st.session_state:
     st.session_state.stop_streaming = False
+
 # Define some funny error messages
 funny_messages = [
     "Oops! Something went wrong... Maybe it's a feature, not a bug? 🤖",
@@ -24,7 +56,8 @@ funny_messages = [
     "Well, this is awkward... Let's pretend this never happened. 😅",
     "Looks like we summoned the error gods today. Let's appease them with a retry! 🔄"
 ]
-#prompt to be used by different nodes for creating summary and generating final response
+
+# Updated prompt templates remain unchanged.
 summary_template = """
 Summarize the following content into a well-structured and concise paragraph that directly addresses the user's query. 
 Ensure the summary highlights the most **relevant and key points**, presenting them in a **clear, coherent, and informative** manner. 
@@ -54,7 +87,7 @@ Context: {context}
 Answer:
 """
 
-# Configuration and setup
+# Configuration and setup code
 langchain_api_key = st.secrets.get("LANGCHAIN_API_KEY")
 unique_id = uuid4().hex[0:8]
 os.environ.update({
@@ -64,34 +97,49 @@ os.environ.update({
     "LANGCHAIN_API_KEY": langchain_api_key
 })
 
-
+# Update your ResearchState to include conversation history.
 class ResearchState(TypedDict):
     query: str
     sources: list[str]
     web_results: list[str]
     summarized_results: list[str]
     response: str
+    history: list[dict]  # Each history dict: {"role": "user"/"assistant", "content": "..."}
+    thread_id: str  # Unique identifier for the conversation thread
 
+# Node definitions now accept and retain the conversation history.
 
-def search_web(state: ResearchState):
+def search_web(state: ResearchState, config: dict = None):
+    # Merge any updates from config.
+    print("S^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^tarting web search with state:", state)
+    state = update_state_with_config(state, config)
     if st.session_state.stop_streaming:
         raise StreamingStoppedError()
+
+    logging.info("Starting web search for query: %s", state["query"])
     search = TavilySearchResults(max_results=3)
     search_results = search.invoke(state["query"])
-    return {
-        "sources": [result['url'] for result in search_results],
-        "web_results": [result['content'] for result in search_results]
-    }
 
+    # Update the state with search results.
+    state["sources"] = [result['url'] for result in search_results]
+    state["web_results"] = [result['content'] for result in search_results]
+    logging.info("Web search completed. Sources: %s", state["sources"])
 
-def summarize_results(state: ResearchState):
+    # Checkpoint the state (including conversation history).
+    memory_saver.checkpoint(state)
+    return state
+
+def summarize_results(state: ResearchState, config: dict = None):
+    print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^Starting summarization with state:", state)
+    state = update_state_with_config(state, config)
     if st.session_state.stop_streaming:
         raise StreamingStoppedError()
+
+    logging.info("Starting summarization for query: %s", state["query"])
     model = ChatOpenAI(
         base_url="https://api.deepseek.com/v1",
         api_key=st.secrets["DEEPSEEK_API_KEY"],
         model="deepseek-chat",
-        #model="deepseek-reasoner",
         streaming=True
     )
     prompt = ChatPromptTemplate.from_template(summary_template)
@@ -99,31 +147,39 @@ def summarize_results(state: ResearchState):
     summarized_results = []
     for content in state["web_results"]:
         summary = chain.invoke({"query": state["query"], "content": content})
-        summarized_results.append(clean_text(summary.content))
-    return {"summarized_results": summarized_results}
+        clean_summary = clean_text(summary.content)
+        summarized_results.append(clean_summary)
+        logging.info("Summarized content: %s", clean_summary)
 
+    state["summarized_results"] = summarized_results
+    memory_saver.checkpoint(state)
+    return state
 
-def generate_response(state: ResearchState):
+def generate_response(state: ResearchState, config: dict = None):
+    print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^Starting response generation with state:", state)
+    state = update_state_with_config(state, config)
     if st.session_state.stop_streaming:
         raise StreamingStoppedError()
+
+    logging.info("Generating response for query: %s", state["query"])
     model = ChatOpenAI(
         base_url="https://api.deepseek.com/v1",
         api_key=st.secrets["DEEPSEEK_API_KEY"],
         model="deepseek-chat",
-        #model="deepseek-reasoner",
         streaming=True
     )
     prompt = ChatPromptTemplate.from_template(generate_response_template)
     chain = prompt | model
     content = "\n\n".join(clean_text(result) for result in state["summarized_results"])
+    memory_saver.checkpoint(state)
+    # The response is returned as a streaming generator.
     return {"response": chain.stream({"question": state["query"], "context": content})}
-
 
 def clean_text(text: str):
     cleaned_text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
-    return cleaned_text  # Preserves original spacing
+    return cleaned_text
 
-# Build LangGraph workflow
+# Build the LangGraph workflow.
 builder = StateGraph(ResearchState)
 builder.add_node("search_web", search_web)
 builder.add_node("summarize_results", summarize_results)
@@ -134,102 +190,127 @@ builder.add_edge("summarize_results", "generate_response")
 builder.set_finish_point("generate_response")
 graph = builder.compile()
 
-
-
-# Streamlit UI
+# -------------------------------------------------------------------
+# Streamlit UI code (updated to set initial state with conversation history)
+# -------------------------------------------------------------------
 st.set_page_config(page_title="AI Research Agent", layout="wide")
 st.subheader("Welcome to AI Research Agent")
 
-# Sidebar controls
 with st.sidebar:
     if st.button("🧹 Clear Chat History"):
         st.session_state.messages = []
     if st.button("🛑 Stop Streaming"):
         st.session_state.stop_streaming = True
 
-# Display chat history
+# Display chat history from the session.
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"], unsafe_allow_html=True)
 
-# Chat input and processing
+# Chat input and processing.
 if prompt := st.chat_input("Enter your research query..."):
-    st.session_state.stop_streaming = False  # Reset streaming flag for new queries
+    st.session_state.stop_streaming = False  # Reset the streaming flag for new queries.
+
+    # Add the new user message to the session state.
     with st.chat_message("user"):
         st.markdown(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.rerun()
 
-    # Add user message to history and trigger rerun
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    st.rerun()  # Force immediate UI update for user message
-
-# Custom error handling class
+# Prepare our custom error class.
 class StreamingStoppedError(Exception):
     """Custom exception raised when streaming is stopped."""
     def __init__(self, message="Streaming has been stopped"):
         super().__init__(message)
 
+if "thread_id" not in st.session_state:
+    st.session_state.thread_id = uuid4().hex
+
+# When processing a new chat message:
 if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
-    # Process AI response
     try:
         user_prompt = st.session_state.messages[-1]["content"]
 
-        # Create placeholder for assistant response
+        # Retrieve the previous state from the custom memory (if available)
+        # and if the thread_id matches, then use that as the base.
+        if "thread_id" in st.session_state and hasattr(memory_saver, "latest_state"):
+            stored_state = memory_saver.latest_state
+            # Ensure that the stored state belongs to the same thread.
+            if stored_state.get("thread_id") == st.session_state.thread_id:
+                initial_state = stored_state
+            else:
+                initial_state = {}
+        else:
+            initial_state = {}
+
+        # Update the initial state with the new query and conversation history.
+        # Here, we merge the persistent state with what’s currently displayed in session.
+        initial_state.update({
+            "query": user_prompt,
+            "sources": initial_state.get("sources", []),
+            "web_results": initial_state.get("web_results", []),
+            "summarized_results": initial_state.get("summarized_results", []),
+            "response": initial_state.get("response", ""),
+            "history": st.session_state.messages.copy(),  # complete conversation history
+            "thread_id": st.session_state.thread_id
+        })
+
+        # Prepare any additional config data if needed.
+        config = {
+            "state_update": {"custom_note": "Added via config"},
+            "configurable": {"thread_id": st.session_state.thread_id}  # redundant if in state, but available if needed.
+        }
+
         with st.chat_message("assistant"):
             response_placeholder = st.empty()
             sources_placeholder = st.empty()
 
         with st.spinner("Researching..."):
             start_time = time.time()
-            response_state = graph.invoke({"query": user_prompt})
-
+            # Pass the merged state and config to the graph.
+            response_state = graph.invoke(initial_state, config=config)
             full_response = []
 
             for chunk in response_state["response"]:
                 if st.session_state.stop_streaming:
-                    # Explicitly set role to assistant before stopping
                     st.session_state.messages.append({
                         "role": "assistant",
-                        "content": "".join(full_response)  # Preserve streamed content
+                        "content": "".join(full_response)
                     })
-                    raise StreamingStoppedError()  # Interrupt response generation
-
+                    raise StreamingStoppedError()
                 chunk_text = clean_text(chunk.content)
                 full_response.append(chunk_text)
 
-                # Continuously update session state with streamed text, ensuring role stays assistant
-                if len(st.session_state.messages) > 0 and st.session_state.messages[-1]["role"] == "assistant":
+                # Update the assistant’s message in session state.
+                if st.session_state.messages and st.session_state.messages[-1]["role"] == "assistant":
                     st.session_state.messages[-1]["content"] = "".join(full_response)
                 else:
                     st.session_state.messages.append({"role": "assistant", "content": "".join(full_response)})
 
                 response_placeholder.markdown("".join(full_response), unsafe_allow_html=True)
 
-            # Final processing
             final_text = "".join(full_response)
             duration = time.time() - start_time
             footnote = f"<div style='font-size:0.8em; color:#666; margin-top:10px;'>⏱️ Processed in {duration:.2f}s</div>"
-
             formatted_response = f"{final_text}\n{footnote}"
             response_placeholder.markdown(formatted_response, unsafe_allow_html=True)
-
             sources_placeholder.markdown(
-                "🔗 **Sources**:\n" + "\n".join(f"- {src}" for src in response_state["sources"]))
+                "🔗 **Sources**:\n" + "\n".join(f"- {src}" for src in response_state["sources"])
+            )
 
-            # Ensure final response is stored before UI refresh
+            # Save the final assistant response and update the history.
             st.session_state.messages.append({
                 "role": "assistant",
                 "content": f"{final_text}\n{footnote}\n\n🔗 **Sources**:\n" +
                            "\n".join(f"- {source}" for source in response_state["sources"])
             })
+            # Also update the state history.
+            response_state["history"] = st.session_state.messages.copy()
 
-        st.session_state.stop_streaming = False  # Reset flag after response
-
+        st.session_state.stop_streaming = False
     except StreamingStoppedError as e:
-        st.error(str(e))  # Display "Streaming has been stopped by the user."
-        st.session_state.stop_streaming = False  # Reset flag after stopping
-
-    except Exception:
-        st.error(random.choice(funny_messages))  # Show a random funny error message
-
+        st.error(str(e))
+        st.session_state.stop_streaming = False
+    except Exception as exc:
+        logging.error("Exception occurred during processing: %s", exc)
+        st.error(random.choice(funny_messages))
