@@ -92,7 +92,7 @@ langchain_api_key = st.secrets.get("LANGCHAIN_API_KEY")
 unique_id = uuid4().hex[0:8]
 os.environ.update({
     "LANGCHAIN_TRACING_V2": "true",
-    "LANGCHAIN_PROJECT": f"AI Research Agent - {unique_id}",
+    "LANGCHAIN_PROJECT": f"AI Research Agent with Short term memory- {unique_id}",
     "LANGCHAIN_ENDPOINT": "https://api.smith.langchain.com",
     "LANGCHAIN_API_KEY": langchain_api_key
 })
